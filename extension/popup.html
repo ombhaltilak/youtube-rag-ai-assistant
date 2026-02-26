@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>YouTube AI Chat</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+<style>
+    /* --- Core App Styles --- */
+    body { 
+        /* Fixed dimensions optimized for a Chrome Extension popup */
+        width: 360px; height: 550px; 
+        font-family: 'Inter', system-ui, -apple-system, sans-serif; 
+        margin: 0; background-color: #f8fafc; 
+        display: flex; flex-direction: column; overflow: hidden; color: #1e293b;
+    }
+
+    /* Gradient header containing the Resync button and Logo */
+    .app-header { 
+        background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%); 
+        color: white; padding: 16px 20px; 
+        display: flex; justify-content: space-between; align-items: center; 
+        box-shadow: 0 4px 12px rgba(99, 102, 241, 0.2); z-index: 20; 
+    }
+
+    .app-header h5 { margin: 0; font-weight: 800; font-size: 1.15rem; display: flex; align-items: center; gap: 8px; }
+
+    /* Button to trigger transcript extraction and backend indexing */
+    .btn-resync { 
+        background: rgba(255, 255, 255, 0.15); color: white; border: 1px solid rgba(255, 255, 255, 0.3); 
+        border-radius: 12px; padding: 6px 14px; font-size: 11px; font-weight: 600; transition: 0.3s; 
+    }
+    .btn-resync:hover:not(:disabled) { background: rgba(255, 255, 255, 0.25); transform: scale(1.05); }
+    .btn-resync:disabled { opacity: 0.7; cursor: not-allowed; }
+
+    /* Layout structure for the dynamic tab system */
+    .content-area { flex-grow: 1; background: #fff; display: flex; flex-direction: column; overflow: hidden; }
+    .tab-pane { display: none; height: 100%; flex-direction: column; overflow-y: auto; background: #fbfcfe; }
+    .tab-pane.active { display: flex; }
+    .view-padding { padding: 20px; }
+
+    /* --- Chat Interface Styles --- */
+    .chat-box { flex-grow: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; padding: 20px; }
+    .message { max-width: 88%; padding: 10px 14px; font-size: 13px; line-height: 1.5; box-shadow: 0 2px 4px rgba(0,0,0,0.03); }
+    .user-message { background: #6366f1; color: white; align-self: flex-end; border-radius: 18px 18px 0px 18px; }
+    .ai-message { background-color: #ffffff; color: #334155; align-self: flex-start; border-radius: 18px 18px 18px 0px; border: 1px solid #e2e8f0; }
+    .system-message { align-self: center; font-size: 11px; color: #64748b; background: #f1f5f9; padding: 6px 12px; border-radius: 20px; width: 90%; text-align: center; }
+
+    /* --- History & Archive List Items --- */
+    .archive-container { display: flex; flex-direction: column; gap: 10px; }
+    .archive-item { 
+        background: white; border: 1px solid #e2e8f0; border-radius: 12px; 
+        padding: 12px; transition: 0.2s; border-left: 4px solid #6366f1;
+    }
+    .archive-item:hover { transform: translateY(-1px); box-shadow: 0 4px 8px rgba(0,0,0,0.05); }
+    .archive-title { font-size: 13px; font-weight: 700; color: #1e293b; margin-bottom: 2px; }
+    
+    .delete-checkbox { width: 16px; height: 16px; accent-color: #6366f1; cursor: pointer; }
+    #clearSelectedBtn { font-weight: 600; border-radius: 10px; font-size: 12px; }
+
+    /* --- Card Components for Info/API screens --- */
+    .info-card { background: white; border: 1px solid #e2e8f0; border-radius: 14px; padding: 16px; margin-bottom: 15px; }
+    .info-header { font-size: 11px; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; display: block; }
+    .info-body { font-size: 13px; color: #475569; line-height: 1.5; margin: 0; }
+
+    /* --- Chat Input & Mode Selectors --- */
+    .input-area { padding: 15px; background: #fff; border-top: 1px solid #f1f5f9; display: flex; flex-direction: column; gap: 10px; }
+    .custom-mode-toggle { display: flex; background: #f1f5f9; border-radius: 10px; padding: 3px; }
+    .custom-mode-toggle input { display: none; }
+    .custom-mode-toggle label { flex: 1; text-align: center; padding: 6px; font-size: 11px; font-weight: 600; color: #64748b; cursor: pointer; border-radius: 8px; transition: 0.2s; }
+    .custom-mode-toggle input:checked + label { background: white; color: #6366f1; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+
+    .custom-input-row { display: flex; gap: 8px; align-items: center; }
+    .custom-input-row input { flex: 1; border-radius: 10px; padding: 10px 14px; border: 1.5px solid #e2e8f0; font-size: 13px; }
+    .custom-input-row button { border-radius: 10px; width: 42px; height: 42px; background: #6366f1; border: none; color: white; transition: 0.2s; display: flex; align-items: center; justify-content: center; }
+    .custom-input-row button:disabled { background: #e2e8f0; color: #94a3b8; }
+
+    /* --- Bottom Tab Bar --- */
+    .bottom-nav { display: flex; background: #fff; border-top: 1px solid #f1f5f9; padding: 6px 0; }
+    .nav-item { flex: 1; display: flex; flex-direction: column; align-items: center; color: #94a3b8; cursor: pointer; font-size: 10px; gap: 2px; }
+    .nav-item i { font-size: 16px; }
+    .nav-item.active { color: #6366f1; font-weight: 600; }
+
+    /* Hyperlinks for cited timestamps */
+    .time-link { color: #6366f1; font-weight: bold; text-decoration: underline; cursor: pointer; }
+
+    /* Custom keyframe animation for the loading sync icon */
+    @keyframes spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+    }
+    .fa-spin-custom {
+        animation: spin 1s linear infinite;
+        display: inline-block;
+    }
+</style>
+</head>
+<body>
+
+    <div class="app-header">
+        <h5><i class="fab fa-youtube"></i> YouTube AI</h5>
+        <button id="resyncBtn" class="btn-resync">
+            <i class="fas fa-sync-alt" id="syncIcon"></i> Resync
+        </button>
+    </div>
+
+    <div class="content-area">
+        
+        <div id="tab-chat" class="tab-pane active">
+            <div id="chat-container" class="chat-box">
+                <div class="message system-message">Welcome! Open a YouTube video and click Resync to start.</div>
+            </div>
+            
+            <div class="input-area mt-auto">
+                <div class="d-flex justify-content-end mb-1">
+                    <button id="clearChatBtn" class="btn btn-link text-danger p-0 border-0" style="font-size: 11px; text-decoration: none; background: none;">
+                        <i class="fas fa-trash-alt"></i> Clear Chat
+                    </button>
+                </div>
+
+                <div class="custom-mode-toggle">
+                    <input type="radio" name="mode" id="modeConcise" checked>
+                    <label for="modeConcise"><i class="fas fa-bolt"></i> Concise</label>
+                    <input type="radio" name="mode" id="modeDetailed">
+                    <label for="modeDetailed"><i class="fas fa-align-left"></i> Detailed</label>
+                </div>
+                <div class="custom-input-row">
+                    <input type="text" id="questionInput" placeholder="Message YouTube AI..." disabled />
+                    <button id="askBtn" disabled><i class="fas fa-paper-plane" id="askIcon"></i></button>
+                </div>
+            </div>
+        </div>
+
+        <div id="tab-history" class="tab-pane view-padding">
+            <h5 class="mb-3 text-secondary" style="font-size: 16px;"><i class="fas fa-history me-1"></i> History</h5>
+            <div id="history-list" class="archive-container">
+                <div class="text-center text-muted small mt-5">No history yet.</div>
+            </div>
+        </div>
+
+        <div id="tab-api" class="tab-pane view-padding">
+            <h5 class="mb-3 text-secondary" style="font-size: 16px;"><i class="fas fa-key me-1"></i> API Setup</h5>
+            <div class="info-card">
+                <span class="info-header">Hugging Face Token</span>
+                <input type="password" id="hfToken" class="form-control mb-3" placeholder="hf_..." style="border-radius: 8px; font-size: 13px;" />
+                <button id="saveTokenBtn" class="btn btn-primary w-100" style="background: #6366f1; border: none; border-radius: 10px; font-weight: bold; font-size: 13px;">Save Token</button>
+            </div>
+        </div>
+
+        <div id="tab-policies" class="tab-pane view-padding">
+    <h5 class="mb-3 text-secondary" style="font-size: 16px;"><i class="fas fa-info-circle me-1"></i> How to Use & Policies</h5>
+
+    <h6 class="mt-3 mb-2 text-primary" style="font-size: 14px; font-weight: bold;">Essential Requirements</h6>
+    <div class="info-card shadow-sm mb-2">
+        <span class="info-header">1. API Key Setup</span>
+        <p class="info-body">You <b>must</b> save your Hugging Face API key in the API tab before asking questions.</p>
+    </div>
+    <div class="info-card shadow-sm mb-2">
+        <span class="info-header">2. Transcripts Required</span>
+        <p class="info-body">The YouTube video must have a transcript or subtitles available (any language is supported).</p>
+    </div>
+    <div class="info-card shadow-sm mb-2">
+        <span class="info-header">3. Keep Video Playing</span>
+        <p class="info-body">For best performance, especially when syncing a new video or restoring history, ensure the video is actively playing (not paused).</p>
+    </div>
+
+    <h6 class="mt-4 mb-2 text-primary" style="font-size: 14px; font-weight: bold;">Syncing & History</h6>
+    <div class="info-card shadow-sm mb-2">
+        <span class="info-header">4. Processing Time</span>
+        <p class="info-body">Please be patient. Syncing a video or restoring a chat from history takes time depending on the video length. Wait for the "Ready" message before typing.</p>
+    </div>
+    <div class="info-card shadow-sm mb-2">
+        <span class="info-header">5. Smart Restoration</span>
+        <p class="info-body">Clicking a session in the History tab automatically restores your chat and transcript. You do not need to click "Resync" for past videos.</p>
+    </div>
+
+    <h6 class="mt-4 mb-2 text-primary" style="font-size: 14px; font-weight: bold;">Privacy & Data Security</h6>
+    <div class="info-card shadow-sm mb-2">
+        <span class="info-header">6. Local Storage Only</span>
+        <p class="info-body">Your API key and chat history are saved <b>strictly locally</b> on your device. Clearing your chat permanently deletes this data from your machine.</p>
+    </div>
+    <div class="info-card shadow-sm mb-2">
+        <span class="info-header">7. No Server Logging</span>
+        <p class="info-body">The backend server (hosted on Hugging Face by <i>Omnbhaltilak</i>) processes queries in active memory only. <b>No data or API keys are ever stored on the cloud.</b></p>
+    </div>
+</div>
+    </div>
+
+    <div class="bottom-nav">
+        <div class="nav-item active" data-target="tab-chat">
+            <i class="fas fa-comment-dots"></i> <span>Chat</span>
+        </div>
+        <div class="nav-item" data-target="tab-history">
+            <i class="fas fa-history"></i> <span>History</span>
+        </div>
+        <div class="nav-item" data-target="tab-api">
+            <i class="fas fa-cog"></i> <span>API</span>
+        </div>
+        <div class="nav-item" data-target="tab-policies">
+            <i class="fas fa-file-contract"></i> <span>Info</span>
+        </div>
+    </div>
+
+    <script src="popup.js"></script>
+</body>
+</html>

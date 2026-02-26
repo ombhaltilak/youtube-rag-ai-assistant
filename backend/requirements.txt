@@ -1,0 +1,22 @@
+# --- Web Framework & Server ---
+Flask==3.1.1                 # Core web framework for the API
+Flask-Cors==5.0.1            # Handles Cross-Origin Resource Sharing for frontend access
+requests==2.32.3             # Library for making HTTP requests
+gunicorn==23.0.0             # Production-grade WSGI HTTP server for deployment
+
+# --- Language & Text Processing ---
+langdetect==1.0.9            # Detects the language of input text
+
+# --- LangChain Ecosystem (Orchestration) ---
+langchain>=0.3.0             # Framework for developing LLM-powered applications
+langchain-core>=0.3.0        # Core abstractions and Base classes for LangChain
+langchain-community>=0.3.0   # Third-party integrations for LangChain
+langchain-huggingface>=0.1.0 # Hugging Face specific integrations (embeddings/models)
+langchain-experimental>=0.3.0 # Experimental LangChain features like advanced splitters
+
+# --- Vector Search & Embeddings ---
+sentence-transformers==2.7.0 # Framework for state-of-the-art sentence/text embeddings
+faiss-cpu==1.9.0             # Library for efficient similarity search of dense vectors
+
+# --- Reranking & Optimization ---
+flashrank>=0.2.4             # Ultra-lite Reranking library to improve search relevance
